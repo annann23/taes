@@ -58,6 +58,8 @@ coms_log  		*coms_LogMsg;
 CFE_SB_PipeId_t    cndh_CommandPipe;
 CFE_SB_MsgPtr_t    cndhMsgPtr;
 
+int a;
+
 static CFE_EVS_BinFilter_t  CNDH_EventFilters[] =
        {  /* Event ID    mask */
           {CNDH_STARTUP_INF_EID,       0x0000},
