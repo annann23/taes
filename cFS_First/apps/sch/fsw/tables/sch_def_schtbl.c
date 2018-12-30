@@ -105,7 +105,7 @@ SCH_ScheduleEntry_t SCH_DefaultScheduleTable[SCH_TABLE_ENTRIES] =
   {  SCH_UNUSED,   0,      0,  0, 0,  SCH_GROUP_NONE},                                        
     
   /* slot #2 */
-  {  SCH_ENABLED, SCH_ACTIVITY_SEND_MSG,  11,  2, 27,  SCH_GROUP_MD_WAKEUP},
+  {  SCH_ENABLED, SCH_ACTIVITY_SEND_MSG,  11,  3, 27,  SCH_GROUP_MD_WAKEUP},
   {  SCH_UNUSED,   0,      0,  0, 0,  SCH_GROUP_NONE},                                        
   {  SCH_UNUSED,   0,      0,  0, 0,  SCH_GROUP_NONE},                                        
   {  SCH_UNUSED,   0,      0,  0, 0,  SCH_GROUP_NONE},                                        

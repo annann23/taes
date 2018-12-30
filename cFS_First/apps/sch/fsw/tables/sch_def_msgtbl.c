@@ -44,9 +44,9 @@
 #include "sch_msgids.h"
 //#include "template_app_msgids.h"
 #include "cndh_msgids.h"
-#include "adc_msgids.h"
 #include "eps_msgids.h"
 #include "coms_msgids.h"
+#include "adcs_msgids.h"
 
 
 /*************************************************************************
@@ -177,7 +177,7 @@ SCH_MessageEntry_t SCH_DefaultMessageTable[SCH_MAX_MESSAGES] =
     /* command ID #25 */
   { { CFE_MAKE_BIG16(CNDH_WAKE_UP_MID),CFE_MAKE_BIG16(0xC000), CFE_MAKE_BIG16(0x0001), 0x0000} },
     /* command ID #26 */
-  { { CFE_MAKE_BIG16(ADC_WAKE_UP_MID),CFE_MAKE_BIG16(0xC000), CFE_MAKE_BIG16(0x0001), 0x0000} },
+  { { CFE_MAKE_BIG16(ADCS_WAKE_UP_MID),CFE_MAKE_BIG16(0xC000), CFE_MAKE_BIG16(0x0001), 0x0000} },
     /* command ID #27 */
   { { CFE_MAKE_BIG16(EPS_WAKE_UP_MID),CFE_MAKE_BIG16(0xC000), CFE_MAKE_BIG16(0x0001), 0x0000} },
     /* command ID #28 */

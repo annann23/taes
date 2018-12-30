@@ -21,9 +21,6 @@
 *************************************************************************/
 
 #include "cfe.h"
-#include "coms_msgids.h"
-#include "coms_perfids.h"
-#include "coms_functions.h"
 #include "cfe.h"
 #include "cfe_error.h"
 #include "cfe_evs.h"
@@ -34,6 +31,10 @@
 #include <errno.h>
 #include <unistd.h>
 
+#include "coms_perfids.h"
+#include "coms_msgids.h"
+#include "coms_msg.h"
+#include "coms_events.h"
 
 /*************************************************************************
 ** Macro definitions

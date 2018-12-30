@@ -21,10 +21,6 @@
 #define CNDH_INVALID_MSGID_ERR_EID     5
 #define CNDH_LEN_ERR_EID               6
 #define CNDH_PROCCESS_INF_EID          7
-/////////////////// user code start//////////////////////
-
-////////////////////user code end/////////////////////////
-
 
 
 #endif /* _app_template_events_h_ */

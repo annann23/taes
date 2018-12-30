@@ -15,15 +15,6 @@
 #ifndef _eps_msgids_h_
 #define _eps_msgids_h_
 
-/*
-** App command codes
-*/
-#define EPS_NOOP_CC                 0
-#define EPS_RESET_COUNTERS_CC       1
-#define EPS_FSS_CSS_ON              2
-#define EPS_AX100_ON              	3
-#define EPS_MTQ_ON              	4
-#define EPS_MTQ_OFF              	5
 /**************************
 ** EPS Command Message IDs
 ***************************/
@@ -40,31 +31,33 @@
 
 #define EPS_HK_TLM_MID                  0x0930 /**< \brief HK Housekeeping Telemetry Message ID */
 
+
+/*
+** App command codes
+*/
+#define EPS_NOOP_CC                 0
+#define EPS_RESET_COUNTERS_CC       1
+#define EPS_FSS_CSS_ON              2
+#define EPS_AX100_ON              	3
+#define EPS_MTQ_ON              	4
+#define EPS_MTQ_OFF              	5
+
+// global data structure
 typedef struct
 {
-	uint8   CmdCHeader[CFE_SB_CMD_HDR_SIZE];
+	uint8   TlmHeader[CFE_SB_TLM_HDR_SIZE];
 	uint16 	Soc;
 	uint16 	temp;
 	uint16	AX100_Status;
-} eps_log_2_cndh;
-
-#define EPS_LOG_LNGTH   sizeof ( eps_log_2_cndh )
-
-typedef struct
-{
-	uint8   CmdCHeader[CFE_SB_CMD_HDR_SIZE];
-	//Add sturct later
-} eps_log_2_adcs;
-
-#define EPS_LOG2_LNGTH   sizeof ( eps_log_2_adcs )
+} eps_log_cndh_t;
+#define EPS_LOG_CNDH_LENGTH   sizeof ( eps_log_cndh_t )
 
 typedef struct
 {
-	uint8   CmdCHeader[CFE_SB_CMD_HDR_SIZE];
+	uint8   TlmHeader[CFE_SB_TLM_HDR_SIZE];
 	uint16	AX100_Status;
-} eps_log_2_coms;
-
-#define EPS_LOG2_LNGTH   sizeof ( eps_log_2_coms )
+} eps_log_coms_t;
+#define EPS_LOG_COMS_LENGTH   sizeof ( eps_log_coms_t  )
 
 #endif /* _eps_msgids_h_ */
 
