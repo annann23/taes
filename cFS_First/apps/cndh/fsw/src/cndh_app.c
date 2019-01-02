@@ -349,6 +349,8 @@ void Separation_Mode_1U(void)
 	OS_printf("Early orbit phase: Separation mode 1U entry\n");
 	// default initialization
 
+	int i =1;
+
 	if (cndh_LocalLog.Soc != 0)
 	{
 		OS_printf("CNDH, Current Soc is %d\n", cndh_LocalLog.Soc);
