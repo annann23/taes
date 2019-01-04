@@ -35,9 +35,7 @@ typedef struct
     uint8              spare[2];
 
 }   OS_PACK eps_hk_tlm_t  ;
-
-
-#define EPS_HK_TLM_LNGTH   sizeof ( eps_hk_tlm_t )
+#define EPS_HK_TLM_LENGTH   sizeof ( eps_hk_tlm_t )
 
 typedef struct
 {
@@ -51,7 +49,7 @@ typedef struct
 	uint16	 MTQ_Status;
 	uint16	 buf1;
 	uint16	 buf2;
-} eps_logtlm_t;
+} eps_log_t;
 
 
 #endif /* eps_msg_app_h_ */

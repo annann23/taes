@@ -13,39 +13,35 @@
 ** $Log: $
 **
 
-/************************************************************************
-** Includes
-*************************************************************************/
+/* Includes */
+
+// local application code include
 #include "eps_app.h"
 
+// global application code include
+#include "cndh_msgids.h"
+#include "coms_msgids.h"
+#include "adcs_msgids.h"
+
+// library and other code include
 #include <string.h>
 #include <stdio.h>
 
-#include "eps_perfids.h"
-#include "eps_msgids.h"
-#include "eps_events.h"
+/* EPS global data */
 
-//#include "cndh_msg.h"
-#include "cndh_msgids.h"
-#include "adc_msgids.h"
-#include "coms_msgids.h"
-//#include "eps_functions.h"
-#include "eps_msg.h"
+// local application data
+eps_hk_tlm_t    eps_hk_tlm;
+eps_log_t	    eps_log;
 
-/************************************************************************
-** EPS global data
-*************************************************************************/
+// send log data list
+eps_log_cndh_t  eps_log_cndh;
+eps_log_coms_t  eps_log_coms;
 
-eps_hk_tlm_t    eps_HkTelemetryPkt;
-eps_logtlm_t    eps_LogMsg1;
-eps_log_2_cndh         eps_LogMsg;
-eps_log_2_coms        eps_LogMsg2;
-
-
-
+// application pointers
 CFE_SB_PipeId_t    eps_CommandPipe;
 CFE_SB_MsgPtr_t    epsMsgPtr;
 
+// event filter (on-going)
 static CFE_EVS_BinFilter_t  EPS_EventFilters[] =
        {  /* Event ID    mask */
           {EPS_STARTUP_INF_EID,       0x0000},
@@ -69,9 +65,7 @@ void EPS_AppMain( void )
 
     EPS_AppInit();
 
-    /*
-    ** eps Runloop
-    */
+    /* eps Runloop */
     while (CFE_ES_RunLoop(&RunStatus) == TRUE)
     {
         CFE_ES_PerfLogExit(EPS_APPMAIN_PERF_ID);
@@ -89,8 +83,8 @@ void EPS_AppMain( void )
     }
 
     CFE_ES_ExitApp(RunStatus);
+}
 
-} /* End of template_AppMain() */
 void EPS_AppInit(void)
 {
 	CFE_ES_RegisterApp();
@@ -99,10 +93,7 @@ void EPS_AppInit(void)
 		sizeof(EPS_EventFilters) / sizeof(CFE_EVS_BinFilter_t),
 		CFE_EVS_BINARY_FILTER);
 
-	/*
-	** Create the Software Bus command pipe and subscribe to housekeeping
-	**  messages
-	*/
+	/* Create the Software Bus command pipe and subscribe to housekeeping messages */
 
 	CFE_SB_CreatePipe(&eps_CommandPipe, EPS_PIPE_DEPTH, "EPS_CMD_PIPE");
 
@@ -112,18 +103,14 @@ void EPS_AppInit(void)
 
 	EPS_ResetCounters();
 
-	CFE_SB_InitMsg(&eps_HkTelemetryPkt,
+	CFE_SB_InitMsg(&eps_hk_tlm,
 					EPS_HK_TLM_MID,
-					EPS_HK_TLM_LNGTH, TRUE);
-
-	CFE_SB_InitMsg(&eps_LogMsg,
-					EPS_LOGMSG_MID,
-					EPS_LOG_LNGTH, TRUE);
+					EPS_HK_TLM_LENGTH, TRUE);
 
 	  CFE_EVS_SendEvent (EPS_STARTUP_INF_EID, CFE_EVS_INFORMATION,
 	               "template EPS Initialized. Version %d.%d.%d.%d");
-	  eps_LogMsg1.buf1 = 0;
-	  eps_LogMsg1.buf2 = 0;
+	  eps_log.buf1 = 0;
+	  eps_log.buf2 = 0;
 } /* End of template_AppInit() */
 
 void EPS_ProcessCommandPacket(void)
@@ -137,21 +124,22 @@ void EPS_ProcessCommandPacket(void)
         case EPS_CMD_MID:
         	EPS_ProcessGroundCommand();
             break;
+
         case EPS_SEND_HK_MID:
             EPS_ReportHousekeeping();
             break;
+
         case EPS_WAKE_UP_MID:
         	EPS_ProcessScheduleCommand();
 			break;
+
         default:
-        	eps_HkTelemetryPkt.eps_command_error_count++;
+        	eps_hk_tlm.eps_command_error_count++;
             CFE_EVS_SendEvent(EPS_COMMAND_ERR_EID,CFE_EVS_ERROR,
 			"EPS: invalid command packet,MID = 0x%x", MsgId);
             break;
     }
-
     return;
-
 } /* End template_ProcessCommandPacket */
 
 
@@ -164,7 +152,7 @@ void EPS_ProcessGroundCommand(void)
     switch (CommandCode)
     {
         case EPS_NOOP_CC:
-            eps_HkTelemetryPkt.eps_command_count++;
+        	eps_hk_tlm.eps_command_count++;
             CFE_EVS_SendEvent(EPS_COMMANDNOP_INF_EID,CFE_EVS_INFORMATION,
 			"EPS, NOOP command");
             break;
@@ -174,8 +162,9 @@ void EPS_ProcessGroundCommand(void)
             break;
 
 		case EPS_AX100_ON:
-			eps_LogMsg1.AX100_Status = 1;
-			OS_printf("EPS, AX100 on\n");
+			eps_log_cndh.AX100_Status = 1;
+			eps_log_coms.AX100_Status = 1;
+			OS_printf("L3:EPS, AX100 on\n");
 			break;
         /* default case already found during FC vs length test */
         default:
@@ -187,60 +176,47 @@ void EPS_ProcessGroundCommand(void)
 
 void EPS_ProcessScheduleCommand(void)
 {
-    CFE_SB_InitMsg(&eps_LogMsg, CNDH_CMD_MID, sizeof(eps_log_2_cndh), TRUE);
-    CFE_SB_InitMsg(&eps_LogMsg2, COMS_CMD_MID, sizeof(eps_log_2_cndh), TRUE);
+    CFE_SB_InitMsg(&eps_log_cndh, CNDH_CMD_MID, EPS_LOG_CNDH_LENGTH, TRUE);
+	CFE_SB_InitMsg(&eps_log_coms, COMS_CMD_MID, EPS_LOG_COMS_LENGTH, TRUE);
 
+	eps_log_cndh.Soc = 70;
+	eps_log_cndh.temp = 30;
 
-	eps_LogMsg.Soc = 70;
-	eps_LogMsg.temp = 30;
-	//OS_printf("EPS, Soc, temp read\n");
-
-		if (eps_LogMsg1.buf1 == 0)
-		{
-			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) eps_LogMsg2.CmdCHeader,5);
-			CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_LogMsg2);
-			eps_LogMsg1.buf1 = 1;
-		}
-
-
-	if (eps_LogMsg1.AX100_Status == 1)
+	if (eps_log_cndh.AX100_Status == 1)
 	{
-		eps_LogMsg.AX100_Status = 1;
-		eps_LogMsg2.AX100_Status = 1;
-		if (eps_LogMsg1.buf2 == 0)
+		if (eps_log.buf2 == 0)
 		{
-			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) eps_LogMsg2.CmdCHeader,4);
-			CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_LogMsg2);
+			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &eps_log_coms.TlmHeader,COMS_GET_EPS_CC);
+			CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_log_coms);
 		}
-		eps_LogMsg1.buf2 = 1;
+		eps_log.buf2 = 1;
 	}
 
-
 	EPS_SendData();
+
 }
 
 
 void EPS_ReportHousekeeping(void)
 {
-    CFE_SB_TimeStampMsg((CFE_SB_Msg_t *) &eps_HkTelemetryPkt);
-    CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_HkTelemetryPkt);
+    CFE_SB_TimeStampMsg((CFE_SB_Msg_t *) &eps_hk_tlm);
+    CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_hk_tlm);
     return;
 }/* End of template_ReportHousekeeping() */
 
 void EPS_SendData(void)
 {
-	 CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) eps_LogMsg.CmdCHeader,CNDH_GET_EPS_CC);
-	 CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_LogMsg);
-
-	 return;
+	CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &eps_log_cndh, CNDH_GET_EPS_CC);
+	CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_log_cndh);
+	return;
 }
 void EPS_ResetCounters(void)
 {
     /* Status of commands processed by the template App */
-  eps_HkTelemetryPkt.eps_command_count       = 0;
-  eps_HkTelemetryPkt.eps_command_error_count = 0;
+	eps_hk_tlm.eps_command_count       = 0;
+	eps_hk_tlm.eps_command_error_count = 0;
 
-  CFE_EVS_SendEvent(EPS_COMMANDRST_INF_EID, CFE_EVS_INFORMATION,
+	CFE_EVS_SendEvent(EPS_COMMANDRST_INF_EID, CFE_EVS_INFORMATION,
 		"EPS, RESET command");
   return;
 
@@ -263,7 +239,7 @@ boolean EPS_VerifyCmdLength(CFE_SB_MsgPtr_t msg, uint16 ExpectedLength)
            "Invalid msg length: ID = 0x%X,  CC = %d, Len = %d, Expected = %d",
               MessageID, CommandCode, ActualLength, ExpectedLength);
         result = FALSE;
-        eps_HkTelemetryPkt.eps_command_error_count++;
+        eps_hk_tlm.eps_command_error_count++;
     }
 
     return(result);

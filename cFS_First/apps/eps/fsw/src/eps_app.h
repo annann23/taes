@@ -30,8 +30,11 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+
 #include "eps_perfids.h"
 #include "eps_msgids.h"
+#include "eps_events.h"
+#include "eps_msg.h"
 //#include "eps_functions.h"
 
 

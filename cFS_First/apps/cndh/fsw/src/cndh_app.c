@@ -21,43 +21,45 @@
 ** $Log: $
 **
 
-/************************************************************************
-** Includes
-*************************************************************************/
+/* Includes */
+
+// local application code include
 #include "cndh_app.h"
 
-//#include "cndh_functions.h"
-//#include "cndh_modes.h"
+// global application code include
+#include "eps_msgids.h"
+#include "coms_msgids.h"
+#include "adcs_msgids.h"
+//#include "gnc_msgids.h"
+
+// library and other code include
 #include <stdio.h>
 #include "gpio_lib.h"
 
-#include "eps_msgids.h"
-#include "adc_msgids.h"
-#include "coms_msgids.h"
-//#include "gnc_msgids.h"
+/* CNDH global data */
 
+// local application data
+cndh_flag_t		 	cndh_flag;
+cndh_hk_tlm_t    	cndh_hk_tlm;
+cndh_log_t     	 	cndh_log;
+cndh_locallog_t	 	cndh_locallog;
 
-/************************************************************************
-** CNDH global data
-*************************************************************************/
-cndh_hk_tlm_t    cndh_HkTelemetryPkt;
-cndh_log     	 cndh_LogMsg;
-cndh_locallog	 cndh_LocalLog;
+// command list
+cndh_cmd_eps_t		cndh_cmd_eps;
+cndh_cmd_coms_t		cndh_cmd_coms;
+cndh_cmd_adc_t		cndh_cmd_adc;
+cndh_cmd_gnc_t		cndh_cmd_gnc;
 
-cndh_epscmd_t 	  cndh_epsCmd;
-cndh_comscmd_t 	  cndh_comsCmd;
-cndh_adccmd_t 	  cndh_adcCmd;
-cndh_gnccmd_t 	  cndh_gncCmd;
+// receive log data list
+eps_log_cndh_t		*eps_log_cndh;
+adcs_log_cndh_t		*adcs_log_cndh;
+coms_log_cndh_t		*coms_log_cndh;
 
-cndh_flag_t		  mode_flag;
+// application pointers
+CFE_SB_PipeId_t    	cndh_CommandPipe;
+CFE_SB_MsgPtr_t    	cndhMsgPtr;
 
-eps_log_2_cndh			*eps_LogMsg;
-adc_log			*adc_LogMsg;
-coms_log  		*coms_LogMsg;
-
-CFE_SB_PipeId_t    cndh_CommandPipe;
-CFE_SB_MsgPtr_t    cndhMsgPtr;
-
+// event filter (on-going)
 static CFE_EVS_BinFilter_t  CNDH_EventFilters[] =
        {  /* Event ID    mask */
           {CNDH_STARTUP_INF_EID,       0x0000},
@@ -68,7 +70,7 @@ static CFE_EVS_BinFilter_t  CNDH_EventFilters[] =
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 /*                                                                 */
-/* CNDH application entry point and main process loop                */
+/* CNDH application entry point and main process loop              */
 /*                                                                 */
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 void CNDH_AppMain( void )
@@ -80,9 +82,7 @@ void CNDH_AppMain( void )
 
     CNDH_AppInit();
 
-    /*
-    ** cndh Runloop
-    */
+    /* cndh Run loop */
     while (CFE_ES_RunLoop(&RunStatus) == TRUE)
     {
         CFE_ES_PerfLogExit(CNDH_APPMAIN_PERF_ID);
@@ -101,7 +101,8 @@ void CNDH_AppMain( void )
 
     CFE_ES_ExitApp(RunStatus);
 
-} /* End of template_AppMain() */
+}
+
 void CNDH_AppInit(void)
 {
 	CFE_ES_RegisterApp();
@@ -110,10 +111,7 @@ void CNDH_AppInit(void)
 		sizeof(CNDH_EventFilters) / sizeof(CFE_EVS_BinFilter_t),
 		CFE_EVS_BINARY_FILTER);
 
-	/*
-	** Create the Software Bus command pipe and subscribe to housekeeping
-	**  messages
-	*/
+	/* Create the Software Bus command pipe and subscribe to housekeeping messages */
 
 	CFE_SB_CreatePipe(&cndh_CommandPipe, CNDH_PIPE_DEPTH, "CNDH_CMD_PIPE");
 
@@ -123,36 +121,32 @@ void CNDH_AppInit(void)
 
 	CNDH_ResetCounters();
 
-	CFE_SB_InitMsg(&cndh_HkTelemetryPkt,
+	CFE_SB_InitMsg(&cndh_hk_tlm,
 		CNDH_HK_TLM_MID,
-		CNDH_APP_HK_TLM_LNGTH, TRUE);
+		CNDH_APP_HK_TLM_LENGTH, TRUE);
 
-	CFE_SB_InitMsg(&cndh_LogMsg,
-        			CNDH_LOGMSG_MID,
-					CNDH_LOG_LNGTH, TRUE);
-
-	CFE_SB_InitMsg(&cndh_epsCmd,
+	CFE_SB_InitMsg(&cndh_cmd_eps,
 					EPS_CMD_MID,
-					CNDH_EPS_CMD_LNGTH, TRUE);
+					CNDH_CMD_EPS_LENGTH, TRUE);
 
-	CFE_SB_InitMsg(&cndh_comsCmd,
+	CFE_SB_InitMsg(&cndh_cmd_coms,
 					COMS_CMD_MID,
-					CNDH_COMS_CMD_LNGTH, TRUE);
+					CNDH_CMD_COMS_LENGTH, TRUE);
 
-	CFE_SB_InitMsg(&cndh_adcCmd,
-					ADC_CMD_MID,
-					CNDH_ADC_CMD_LNGTH, TRUE);
+	CFE_SB_InitMsg(&cndh_cmd_adc,
+					ADCS_CMD_MID,
+					CNDH_CMD_ADC_LENGTH, TRUE);
 
-/*	CFE_SB_InitMsg(&cndh_gncCmd,
+/*	CFE_SB_InitMsg(&cndh_cmd_gnc,
 					GNC_CMD_MID,
-					CNDH_GNC_CMD_LNGTH, TRUE);*/
+					CNDH_CMD_GNC_LENGTH, TRUE);*/
 
     CFE_EVS_SendEvent (CNDH_STARTUP_INF_EID, CFE_EVS_INFORMATION,
                "template CNDH Initialized.");
 
-    mode_flag.flag = 0;
-    cndh_LogMsg.MTQ_Control_status = 0;
-    cndh_LogMsg.Antenna_status = 0;
+    cndh_flag.flag = 0;
+    cndh_log.MTQ_Control_status = 0;
+    cndh_log.Antenna_status = 0;
 
 } /* End of template_AppInit() */
 
@@ -178,7 +172,7 @@ void CNDH_ProcessCommandPacket(void)
 			break;
 
         default:
-            cndh_HkTelemetryPkt.cndh_command_error_count++;
+        	cndh_hk_tlm.cndh_command_error_count++;
             CFE_EVS_SendEvent(CNDH_COMMAND_ERR_EID,CFE_EVS_ERROR,
 			"CNDH: invalid command packet,MID = 0x%x", MsgId);
             break;
@@ -197,44 +191,45 @@ void CNDH_ProcessGroundCommand(void)
     switch (CommandCode)
     {
         case CNDH_NOOP_CC:
-            cndh_HkTelemetryPkt.cndh_command_count++;
+        	cndh_hk_tlm.cndh_command_count++;
             CFE_EVS_SendEvent(CNDH_COMMANDNOP_INF_EID,CFE_EVS_INFORMATION,
 			"CNDH, NOOP command\n");
             break;
 
         case CNDH_RESET_COUNTERS_CC:
         	CNDH_ResetCounters();
-
             break;
 
 		case CNDH_COMMUNICATION_CC:
+			cndh_hk_tlm.cndh_command_count++;
+			OS_printf("L1:CNDH, Communication mode entry\n");
+			coms_log_cndh = (coms_log_cndh_t *)cndhMsgPtr;
+			CNDH_Save_data(4);
+			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_cmd_coms, COMS_SEND_HK);
+			CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_cmd_coms);
 			break;
 
 		case CNDH_GET_EPS_CC:
-			cndh_HkTelemetryPkt.cndh_command_count++;
-			eps_LogMsg = (eps_log_2_cndh *)cndhMsgPtr;
+			cndh_hk_tlm.cndh_command_count++;
+			eps_log_cndh = (eps_log_cndh_t *)cndhMsgPtr;
 			CNDH_Save_data(1);
-			OS_printf("CNDH, EPS data get\n");
+			OS_printf("L5:CNDH, EPS data get\n");
 			break;
 
-		case CNDH_GET_ADC_CC:
-			cndh_HkTelemetryPkt.cndh_command_count++;
-		   adc_LogMsg = (adc_log *)cndhMsgPtr;
-		   CNDH_Save_data(2);
-			OS_printf("CNDH, ADCS data get\n");
+		case CNDH_GET_ADCS_CC:
+			cndh_hk_tlm.cndh_command_count++;
+			adcs_log_cndh = (adcs_log_cndh_t *)cndhMsgPtr;
+			CNDH_Save_data(2);
+			OS_printf("L5:CNDH, ADCS data get\n");
 			break;
 
 		case CNDH_GET_COMS_CC:
-			cndh_HkTelemetryPkt.cndh_command_count++;
-			coms_LogMsg = (coms_log *)cndhMsgPtr;
+			cndh_hk_tlm.cndh_command_count++;
+			coms_log_cndh = (coms_log_cndh_t *)cndhMsgPtr;
 			CNDH_Save_data(3);
-			OS_printf("CNDH, COMS data get\n");
+			OS_printf("L5:CNDH, COMS data get\n");
 			break;
-			/*
-			 * here need to add details
-			 */
 
-        /* default case already found during FC vs length test */
         default:
             break;
     }
@@ -246,38 +241,43 @@ void CNDH_ProcessGroundCommand(void)
 void CNDH_Save_data(int number)
 {
 	   switch (number)
-	    {
-
+	   {
 	   case 1:
-		   cndh_LocalLog.Soc = eps_LogMsg->Soc;
-		   cndh_LocalLog.temp = eps_LogMsg->temp;
-		   cndh_LocalLog.AX100_Status = eps_LogMsg->AX100_Status;
-		break;
+		   cndh_locallog.Soc = eps_log_cndh->Soc;
+		   cndh_locallog.temp = eps_log_cndh->temp;
+		   cndh_locallog.AX100_Status = eps_log_cndh->AX100_Status;
+		   break;
 
 	   case 2:
-		   cndh_LocalLog.IMU_Checksum = adc_LogMsg->IMU_Checksum;
-		   cndh_LocalLog.MMT_Checksum = adc_LogMsg->MMT_Checksum;
-		   cndh_LocalLog.FSS_Checksum = adc_LogMsg->FSS_Checksum;
-			cndh_LocalLog.CSS_Checksum = adc_LogMsg->CSS_Checksum;
-			cndh_LocalLog.AngVel[0] = adc_LogMsg->AngVel[0];
-			cndh_LocalLog.AngVel[1] = adc_LogMsg->AngVel[1];
-			cndh_LocalLog.AngVel[2] = adc_LogMsg->AngVel[2];
-		break;
+		   cndh_locallog.IMU_Checksum = adcs_log_cndh->IMU_Checksum;
+		   cndh_locallog.MMT_Checksum = adcs_log_cndh->MMT_Checksum;
+		   cndh_locallog.FSS_Checksum = adcs_log_cndh->FSS_Checksum;
+		   cndh_locallog.CSS_Checksum = adcs_log_cndh->CSS_Checksum;
+		   cndh_locallog.AngVel[0] = adcs_log_cndh->AngVel[0];
+		   cndh_locallog.AngVel[1] = adcs_log_cndh->AngVel[1];
+		   cndh_locallog.AngVel[2] = adcs_log_cndh->AngVel[2];
+		   break;
 
 	   case 3:
-		   cndh_LocalLog.AX100_Checksum = coms_LogMsg->AX100_Checksum;
-		break;
-	    }
+		   cndh_locallog.AX100_Checksum = coms_log_cndh->AX100_Checksum;
+		   break;
+
+	   case 4:
+		   cndh_locallog.Ground_time = coms_log_cndh->time;
+		   cndh_flag.flag = coms_log_cndh->flag;
+		   break;
+	   }
 }
 
 void CNDH_ProcessScheduleCommand(void)
 {
-	switch (mode_flag.flag)
+	switch (cndh_flag.flag)
 	{
 		case 0:
-			if (cndh_HkTelemetryPkt.cndh_command_count > 0)
-				mode_flag.flag = 1;
+			if (cndh_hk_tlm.cndh_command_count > 0)
+				cndh_flag.flag = 1;
 			break;
+
 		case 1: //separation mode
 			Separation_Mode_1U();
 			break;
@@ -287,36 +287,36 @@ void CNDH_ProcessScheduleCommand(void)
 			break;
 
 		case 3: // normal(EO) mode
-			//normalEO_Mode_1U();
+			normalEO_Mode_1U();
 			break;
-		case 6:
 
+		case 4: //commissioning 1 (GPS)
+			OS_printf("L1:Early orbit phase: Commissioning 1 (GPS) mode 1U entry\n");
+			OS_printf("CNDH, Commissioning 1 (GPS) done\n");
+			cndh_flag.flag = 3;
 			break;
 	}
-
-	/*
-	 * mode operation consider flag
-	 */
 }
 
 void CNDH_ReportHousekeeping(void)
 {
-    CFE_SB_TimeStampMsg((CFE_SB_Msg_t *) &cndh_HkTelemetryPkt);
-    CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_HkTelemetryPkt);
+    CFE_SB_TimeStampMsg((CFE_SB_Msg_t *) &cndh_hk_tlm);
+    CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_hk_tlm);
     return;
 
-} /* End of template_ReportHousekeeping() */
+}
+
 void CNDH_ResetCounters(void)
 {
     /* Status of commands processed by the template App */
-    cndh_HkTelemetryPkt.cndh_command_count       = 0;
-    cndh_HkTelemetryPkt.cndh_command_error_count = 0;
+	cndh_hk_tlm.cndh_command_count       = 0;
+	cndh_hk_tlm.cndh_command_error_count = 0;
 
     CFE_EVS_SendEvent(CNDH_COMMANDRST_INF_EID, CFE_EVS_INFORMATION,
 		"CNDH, RESET command");
     return;
 
-} /* End of template_ResetCounters() */
+}
 
 boolean CNDH_VerifyCmdLength(CFE_SB_MsgPtr_t msg, uint16 ExpectedLength)
 {
@@ -324,9 +324,7 @@ boolean CNDH_VerifyCmdLength(CFE_SB_MsgPtr_t msg, uint16 ExpectedLength)
 
     uint16 ActualLength = CFE_SB_GetTotalMsgLength(msg);
 
-    /*
-    ** Verify the command packet length.
-    */
+    /* Verify the command packet length. */
     if (ExpectedLength != ActualLength)
     {
         CFE_SB_MsgId_t MessageID   = CFE_SB_GetMsgId(msg);
@@ -336,61 +334,58 @@ boolean CNDH_VerifyCmdLength(CFE_SB_MsgPtr_t msg, uint16 ExpectedLength)
            "Invalid msg length: ID = 0x%X,  CC = %d, Len = %d, Expected = %d",
               MessageID, CommandCode, ActualLength, ExpectedLength);
         result = FALSE;
-        cndh_HkTelemetryPkt.cndh_command_error_count++;
+        cndh_hk_tlm.cndh_command_error_count++;
     }
-
     return(result);
 
-} /* End of template_VerifyCmdLength() */
+}
 
 void Separation_Mode_1U(void)
 {
-	cndh_LogMsg.mode_status = 0;
-	OS_printf("Early orbit phase: Separation mode 1U entry\n");
-	// default initialization
+	cndh_log.mode_status = 0;
+	OS_printf("L1:Early orbit phase: Separation mode 1U entry\n");
+  
+	if (cndh_locallog.Soc != 0)
 
-	int i =1;
-
-	if (cndh_LocalLog.Soc != 0)
 	{
-		OS_printf("CNDH, Current Soc is %d\n", cndh_LocalLog.Soc);
-		if (cndh_LocalLog.temp != 0)
+		OS_printf("L0:CNDH, Current Soc is %d\n", cndh_locallog.Soc);
+		if (cndh_locallog.temp != 0)
 		{
-			OS_printf("CNDH, Current bat temp is %d\n", cndh_LocalLog.temp);
-			cndh_LogMsg.mode_status++;
+			OS_printf("L0:CNDH, Current bat temp is %d\n", cndh_locallog.temp);
+			cndh_log.mode_status++;
 		}
 	}
 
-	if (cndh_LocalLog.IMU_Checksum == 1)
+	if (cndh_locallog.IMU_Checksum == 1)
 	{
-		if (cndh_LocalLog.MMT_Checksum ==1)
+		if (cndh_locallog.MMT_Checksum ==1)
 		{
-			OS_printf("CNDH, IMU/MMT checksum done\n");
-			cndh_LogMsg.mode_status++;
+			OS_printf("L2:CNDH, IMU/MMT checksum done\n");
+			cndh_log.mode_status++;
 		}
 	}
 
-	if (cndh_LocalLog.FSS_Checksum == 1)
+	if (cndh_locallog.FSS_Checksum == 1)
 	{
-		if (cndh_LocalLog.CSS_Checksum == 1)
+		if (cndh_locallog.CSS_Checksum == 1)
 		{
-			OS_printf("CNDH, FSS/CSS checksum done\n");
-			cndh_LogMsg.mode_status++;
+			OS_printf("L2:CNDH, FSS/CSS checksum done\n");
+			cndh_log.mode_status++;
 		}
 	}
-	if (cndh_LocalLog.AX100_Status == 0)
+	if (cndh_locallog.AX100_Status == 0)
 	{
-		CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_epsCmd, EPS_AX100_ON); //send command 3 to eps for AX100U on
-		CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_epsCmd);
+		CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_cmd_eps, EPS_AX100_ON);
+		CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_cmd_eps);
 	}
 
-	if (cndh_LocalLog.AX100_Checksum == 1) //AX100U check sum result
+	if (cndh_locallog.AX100_Checksum == 1) //AX100U check sum result
 	{
-		OS_printf("CNDH, AX100 checksum done\n");
-		cndh_LogMsg.mode_status++;
+		OS_printf("L2:CNDH, AX100 checksum done\n");
+		cndh_log.mode_status++;
 	}
 
-	if (cndh_LogMsg.Antenna_status == 0)
+	if (cndh_log.Antenna_status == 0) // need to change
 	{
 		//UHF antenna 1, LED1 12
 		//UHF antenna 2, LED1 16
@@ -405,8 +400,8 @@ void Separation_Mode_1U(void)
 
 		if (GPIOLib_Read(12) == 1)
 			{
-				OS_printf("UHF antenna 1 deploy done\n");
-				cndh_LogMsg.mode_status++;
+				OS_printf("L3:UHF antenna 1 deploy done\n");
+				cndh_log.mode_status++;
 				//sleep(1);
 				GPIOLib_Write(12,0);
 			}
@@ -417,8 +412,8 @@ void Separation_Mode_1U(void)
 
 		if (GPIOLib_Read(16) == 1)
 			{
-				OS_printf("UHF antenna 2 deploy done\n");
-				cndh_LogMsg.mode_status++;
+				OS_printf("L3:UHF antenna 2 deploy done\n");
+				cndh_log.mode_status++;
 				//sleep(1);
 				GPIOLib_Write(16,0);
 			}
@@ -429,8 +424,8 @@ void Separation_Mode_1U(void)
 
 		if (GPIOLib_Read(20) == 1)
 			{
-				OS_printf("UHF antenna 3 deploy done\n");
-				cndh_LogMsg.mode_status++;
+				OS_printf("L3:UHF antenna 3 deploy done\n");
+				cndh_log.mode_status++;
 				//sleep(1);
 				GPIOLib_Write(20,0);
 			}
@@ -441,8 +436,8 @@ void Separation_Mode_1U(void)
 
 		if (GPIOLib_Read(21) == 1)
 			{
-				OS_printf("UHF antenna 4 deploy done\n");
-				cndh_LogMsg.mode_status++;
+				OS_printf("L3:UHF antenna 4 deploy done\n");
+				cndh_log.mode_status++;
 				//sleep(1);
 				GPIOLib_Write(21,0);
 			}
@@ -451,115 +446,161 @@ void Separation_Mode_1U(void)
 		GPIOLib_Unexport(20);
 		GPIOLib_Unexport(21);
 		GPIOLib_Close();
-		cndh_LogMsg.Antenna_status = 1;
+		cndh_log.Antenna_status = 1;
 	}
 
 
-	if (cndh_LogMsg.Antenna_status == 1)
+	if (cndh_log.Antenna_status == 1)
 	{
-		cndh_LogMsg.mode_status++;
-		cndh_LogMsg.mode_status++;
-		cndh_LogMsg.mode_status++;
-		cndh_LogMsg.mode_status++;
+		cndh_log.mode_status++;
+		cndh_log.mode_status++;
+		cndh_log.mode_status++;
+		cndh_log.mode_status++;
 	}
 
-	if (cndh_LocalLog.AX100_Checksum == 1) //AX100U check sum result
+	if (cndh_locallog.AX100_Checksum == 1) //AX100U check sum result
 	{
-		CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_comsCmd, 3); //send command 1 to coms for beacon
-		CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_comsCmd);
+		CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_cmd_coms, COMS_TRANSMIT_BEACON); //send command 1 to coms for beacon
+		CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_cmd_coms);
 	}
 
-	CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_adcCmd, 2); //send command 1 to adc for AD
-	CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_adcCmd);
+	CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_cmd_adc, ADCS_AD_COMMAND); //send command 1 to adc for AD
+	CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_cmd_adc);
 
-	if (cndh_LogMsg.mode_status == 8)
+	if (cndh_log.mode_status == 8)
 	{
-		mode_flag.flag = 2;
+		cndh_flag.flag = 2;
 	}
 
 }
 
 void Stablization_Mode_1U(void)
 {
-	cndh_LogMsg.mode_status = 0;
-	OS_printf("Early orbit phase: Stablization mode 1U entry\n");
+	cndh_log.mode_status = 0;
+	OS_printf("L1:Early orbit phase: Stablization mode 1U entry\n");
 
-	if (cndh_LocalLog.Soc != 0)
+	if (cndh_locallog.Soc != 0)
 	{
-		OS_printf("CNDH, Current Soc is %d\n", cndh_LocalLog.Soc);
-		if (cndh_LocalLog.temp != 0)
+		OS_printf("L0:CNDH, Current Soc is %d\n", cndh_locallog.Soc);
+		if (cndh_locallog.temp != 0)
 		{
-			OS_printf("CNDH, Current bat temp is %d\n", cndh_LocalLog.temp);
-			cndh_LogMsg.mode_status++;
+			OS_printf("L0:CNDH, Current bat temp is %d\n", cndh_locallog.temp);
+			cndh_log.mode_status++;
 		}
 	}
 
-	if (cndh_LocalLog.IMU_Checksum == 1)
+	if (cndh_locallog.IMU_Checksum == 1)
 	{
-		if (cndh_LocalLog.MMT_Checksum ==1)
+		if (cndh_locallog.MMT_Checksum ==1)
 		{
-			OS_printf("CNDH, IMU/MMT checksum done\n");
-			cndh_LogMsg.mode_status++;
+			OS_printf("L2:CNDH, IMU/MMT checksum done\n");
+			cndh_log.mode_status++;
 		}
 	}
 
-	if (cndh_LocalLog.FSS_Checksum == 1)
+	if (cndh_locallog.FSS_Checksum == 1)
 	{
-		if (cndh_LocalLog.CSS_Checksum == 1)
+		if (cndh_locallog.CSS_Checksum == 1)
 		{
-			OS_printf("CNDH, FSS/CSS checksum done\n");
-			cndh_LogMsg.mode_status++;
+			OS_printf("L2:CNDH, FSS/CSS checksum done\n");
+			cndh_log.mode_status++;
 		}
 	}
 
-	if (cndh_LocalLog.AngVel[0] > 5 || cndh_LocalLog.AngVel[0] < -5)
+	if (cndh_locallog.AngVel[0] > 5 || cndh_locallog.AngVel[0] < -5)
 		{
-			if (cndh_LogMsg.MTQ_Control_status == 1)
+			if (cndh_log.MTQ_Control_status == 1)
 				{
-					OS_printf("CNDH, Detumbling On going\n");
+					OS_printf("L3:CNDH, Detumbling On going\n");
 				}
-			if (cndh_LogMsg.MTQ_Control_status == 0)
+			if (cndh_log.MTQ_Control_status == 0)
 				{
-					OS_printf("CNDH, Detumbling Start\n");
-					cndh_LogMsg.MTQ_Control_status = 1;
+					OS_printf("L3:CNDH, Detumbling Start\n");
+					cndh_log.MTQ_Control_status = 1;
 
-					CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) cndh_adcCmd.CmdHeader, 3); //MTQ control
-					CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_adcCmd);
+					CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) cndh_cmd_adc.CmdHeader, ADCS_DETUMB_START_COMMAND); //MTQ control
+					CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_cmd_adc);
 				}
 		}
-	if (cndh_LocalLog.AngVel[0] < 5 && cndh_LocalLog.AngVel[0] > -5)
+
+	if (cndh_locallog.AngVel[0] < 5 && cndh_locallog.AngVel[0] > -5)
 		{
 
-			if (cndh_LogMsg.MTQ_Control_status == 0)
+			if (cndh_log.MTQ_Control_status == 0)
 				{
-					OS_printf("CNDH, Detumbling pass\n");
+					OS_printf("L3:CNDH, Detumbling pass\n");
 				}
-			if (cndh_LogMsg.MTQ_Control_status == 1)
+			if (cndh_log.MTQ_Control_status == 1)
 				{
-					OS_printf("CNDH, Detumbling end\n");
-					CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) cndh_adcCmd.CmdHeader, 4); //MTQ control
-					CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_adcCmd);
-					cndh_LogMsg.MTQ_Control_status = 0;
+					OS_printf("L3:CNDH, Detumbling end\n");
+					CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) cndh_cmd_adc.CmdHeader, ADCS_DETUMB_END_COMMAND); //MTQ control
+					CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_cmd_adc);
+					cndh_log.MTQ_Control_status = 0;
 				}
-
 		}
 
-	if (cndh_LocalLog.AX100_Checksum == 1) //AX100U check sum result
+	if (cndh_locallog.AX100_Checksum == 1) //AX100U check sum result
 	{
-		OS_printf("CNDH, AX100 checksum done\n");
-		cndh_LogMsg.mode_status++;
+		OS_printf("L2:CNDH, AX100 checksum done\n");
+		cndh_log.mode_status++;
 	}
 
-	if (cndh_LocalLog.AX100_Checksum == 1) //AX100U check sum result
+	if (cndh_locallog.AX100_Checksum == 1) //AX100U check sum result
 	{
-		CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_comsCmd, 3); //send command 1 to coms for beacon
-		CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_comsCmd);
+		CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_cmd_coms, COMS_TRANSMIT_BEACON); //send command 1 to coms for beacon
+		CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_cmd_coms);
 	}
 
-	if (cndh_LogMsg.mode_status == 77)
+	if (cndh_log.mode_status == 4)
 	{
-		mode_flag.flag = 3;
+		cndh_flag.flag = 3;
 	}
+}
+
+void normalEO_Mode_1U(void)
+{
+	cndh_log.mode_status = 0;
+
+	OS_printf("L1:Early orbit phase: Normal mode 1U entry\n");
+	if (cndh_locallog.Soc != 0)
+	{
+		OS_printf("L0:CNDH, Current Soc is %d\n", cndh_locallog.Soc);
+		if (cndh_locallog.temp != 0)
+		{
+			OS_printf("L0:CNDH, Current bat temp is %d\n", cndh_locallog.temp);
+			cndh_log.mode_status++;
+		}
+	}
+
+	if (cndh_locallog.IMU_Checksum == 1)
+	{
+		if (cndh_locallog.MMT_Checksum ==1)
+		{
+			OS_printf("L2:CNDH, IMU/MMT checksum done\n");
+			cndh_log.mode_status++;
+		}
+	}
+
+	if (cndh_locallog.FSS_Checksum == 1)
+	{
+		if (cndh_locallog.CSS_Checksum == 1)
+		{
+			OS_printf("L2:CNDH, FSS/CSS checksum done\n");
+			cndh_log.mode_status++;
+		}
+	}
+
+	if (cndh_locallog.AX100_Checksum == 1) //AX100U check sum result
+		{
+			OS_printf("L2:CNDH, AX100 checksum done\n");
+			cndh_log.mode_status++;
+		}
+
+		if (cndh_locallog.AX100_Checksum == 1) //AX100U check sum result
+		{
+			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_cmd_coms, COMS_TRANSMIT_BEACON); //send command 1 to coms for beacon
+			CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_cmd_coms);
+		}
 }
 
 /************************/
