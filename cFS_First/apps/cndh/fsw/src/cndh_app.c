@@ -344,8 +344,9 @@ void Separation_Mode_1U(void)
 {
 	cndh_log.mode_status = 0;
 	OS_printf("L1:Early orbit phase: Separation mode 1U entry\n");
-
+  
 	if (cndh_locallog.Soc != 0)
+
 	{
 		OS_printf("L0:CNDH, Current Soc is %d\n", cndh_locallog.Soc);
 		if (cndh_locallog.temp != 0)
