@@ -49,6 +49,7 @@ typedef struct
 	uint16	 MTQ_Status;
 	uint16	 buf1;
 	uint16	 buf2;
+	uint16	 Antenna_number;
 } eps_log_t;
 
 

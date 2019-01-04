@@ -27,14 +27,15 @@
 #include "cfe_sb.h"
 #include "cfe_es.h"
 
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
 
 #include "eps_perfids.h"
-#include "eps_msgids.h"
 #include "eps_events.h"
 #include "eps_msg.h"
+#include "eps_msgids.h"
 //#include "eps_functions.h"
 
 
@@ -42,6 +43,8 @@
 ** Macro definitions
 **************************************************************************/
 #define EPS_PIPE_DEPTH                     32
+
+
 
 
 /************************************************************************
@@ -63,8 +66,11 @@ void EPS_AppInit(void);
 void EPS_ProcessCommandPacket(void);
 void EPS_ProcessGroundCommand(void);
 void EPS_ProcessScheduleCommand(void);
-void EPS_ReportHousekeeping(void);
+
 void EPS_SendData(void);
+uint8 Antenna_Deploy(uint16 antenna_number);
+
+void EPS_ReportHousekeeping(void);
 void EPS_ResetCounters(void);
 boolean EPS_VerifyCmdLength(CFE_SB_MsgPtr_t msg, uint16 ExpectedLength);
 

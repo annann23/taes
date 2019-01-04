@@ -25,6 +25,7 @@
 #define CNDH_GET_EPS_CC              3
 #define CNDH_GET_ADCS_CC             4
 #define CNDH_GET_COMS_CC             5
+#define CNDH_GET_EPS_ANTENNA_CC      6
 
 /**************************
 ** CNDH Command Message IDs
@@ -40,6 +41,15 @@
 ****************************/
 
 #define CNDH_HK_TLM_MID                  0x0900
+
+typedef struct
+{
+	uint8   TlmHeader[CFE_SB_TLM_HDR_SIZE];
+	uint16	Antenna_number;
+} cndh_log_eps_t;
+#define CNDH_LOG_EPS_LENGTH   sizeof ( cndh_log_eps_t )
+
+
 
 #endif /* _cndh_msgids_h_ */
 

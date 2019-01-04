@@ -37,8 +37,8 @@
 */
 #define EPS_NOOP_CC                 0
 #define EPS_RESET_COUNTERS_CC       1
-#define EPS_FSS_CSS_ON              2
-#define EPS_AX100_ON              	3
+#define EPS_AX100_ON              	2
+#define EPS_ANTENNA_DEPLOY         	3
 #define EPS_MTQ_ON              	4
 #define EPS_MTQ_OFF              	5
 
@@ -51,6 +51,14 @@ typedef struct
 	uint16	AX100_Status;
 } eps_log_cndh_t;
 #define EPS_LOG_CNDH_LENGTH   sizeof ( eps_log_cndh_t )
+
+typedef struct
+{
+	uint8   TlmHeader[CFE_SB_TLM_HDR_SIZE];
+	uint8	Antenna_status;
+} eps_log_cndh_antenna_t;
+#define EPS_LOG_CNDH_ANTENNA_LENGTH   sizeof ( eps_log_cndh_antenna_t )
+
 
 typedef struct
 {

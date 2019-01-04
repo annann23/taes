@@ -50,10 +50,13 @@ cndh_cmd_coms_t		cndh_cmd_coms;
 cndh_cmd_adc_t		cndh_cmd_adc;
 cndh_cmd_gnc_t		cndh_cmd_gnc;
 
+cndh_log_eps_t		cndh_log_eps;
+
 // receive log data list
-eps_log_cndh_t		*eps_log_cndh;
-adcs_log_cndh_t		*adcs_log_cndh;
-coms_log_cndh_t		*coms_log_cndh;
+eps_log_cndh_t			*eps_log_cndh;
+eps_log_cndh_antenna_t	*eps_log_cndh_antenna;
+adcs_log_cndh_t			*adcs_log_cndh;
+coms_log_cndh_t			*coms_log_cndh;
 
 // application pointers
 CFE_SB_PipeId_t    	cndh_CommandPipe;
@@ -230,6 +233,13 @@ void CNDH_ProcessGroundCommand(void)
 			OS_printf("L5:CNDH, COMS data get\n");
 			break;
 
+		case CNDH_GET_EPS_ANTENNA_CC:
+			cndh_hk_tlm.cndh_command_count++;
+			eps_log_cndh_antenna = (eps_log_cndh_antenna_t *)cndhMsgPtr;
+			CNDH_Save_data(5);
+			OS_printf("L5:CNDH, EPS data get\n");
+			break;
+
         default:
             break;
     }
@@ -265,6 +275,10 @@ void CNDH_Save_data(int number)
 	   case 4:
 		   cndh_locallog.Ground_time = coms_log_cndh->time;
 		   cndh_flag.flag = coms_log_cndh->flag;
+		   break;
+
+	   case 5:
+		   cndh_log.Antenna_status = eps_log_cndh_antenna->Antenna_status;
 		   break;
 	   }
 }
@@ -340,18 +354,17 @@ boolean CNDH_VerifyCmdLength(CFE_SB_MsgPtr_t msg, uint16 ExpectedLength)
 
 }
 
-void Separation_Mode_1U(void)
+uint8 Sensor_Check(void)
 {
-	cndh_log.mode_status = 0;
-	OS_printf("L1:Early orbit phase: Separation mode 1U entry\n");
-
+	uint8 sensor_status;
+	sensor_status = 0;
 	if (cndh_locallog.Soc != 0)
 	{
 		OS_printf("L0:CNDH, Current Soc is %d\n", cndh_locallog.Soc);
 		if (cndh_locallog.temp != 0)
 		{
 			OS_printf("L0:CNDH, Current bat temp is %d\n", cndh_locallog.temp);
-			cndh_log.mode_status++;
+			sensor_status++;
 		}
 	}
 
@@ -360,7 +373,7 @@ void Separation_Mode_1U(void)
 		if (cndh_locallog.MMT_Checksum ==1)
 		{
 			OS_printf("L2:CNDH, IMU/MMT checksum done\n");
-			cndh_log.mode_status++;
+			sensor_status++;
 		}
 	}
 
@@ -369,9 +382,54 @@ void Separation_Mode_1U(void)
 		if (cndh_locallog.CSS_Checksum == 1)
 		{
 			OS_printf("L2:CNDH, FSS/CSS checksum done\n");
-			cndh_log.mode_status++;
+			sensor_status++;
 		}
 	}
+	return(sensor_status);
+}
+
+void Antenna_Deploy_Cmd(void)
+{
+	CFE_SB_InitMsg(&cndh_log_eps, EPS_CMD_MID, CNDH_LOG_EPS_LENGTH, TRUE);
+	switch (cndh_log.Antenna_status)
+	{
+		case 0:
+			//UHF antenna 1, LED1 12
+			cndh_log_eps.Antenna_number = 12;
+			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_log_eps, EPS_ANTENNA_DEPLOY);
+			CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_log_eps);
+			break;
+
+		case 1:
+			//UHF antenna 2, LED2 16
+			cndh_log_eps.Antenna_number = 16;
+			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_log_eps, EPS_ANTENNA_DEPLOY);
+			CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_log_eps);
+			break;
+
+		case 2:
+			//UHF antenna 3, LED3 20
+			cndh_log_eps.Antenna_number = 20;
+			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_log_eps, EPS_ANTENNA_DEPLOY);
+			CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_log_eps);
+			break;
+
+		case 3:
+			//UHF antenna 3, LED4 21
+			cndh_log_eps.Antenna_number = 21;
+			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_log_eps, EPS_ANTENNA_DEPLOY);
+			CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_log_eps);
+			break;
+	}
+}
+
+void Separation_Mode_1U(void)
+{
+	cndh_log.mode_status = 0;
+	OS_printf("L1:Early orbit phase: Separation mode 1U entry\n");
+
+	cndh_log.mode_status = Sensor_Check();
+
 	if (cndh_locallog.AX100_Status == 0)
 	{
 		CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_cmd_eps, EPS_AX100_ON);
@@ -384,78 +442,9 @@ void Separation_Mode_1U(void)
 		cndh_log.mode_status++;
 	}
 
-	if (cndh_log.Antenna_status == 0) // need to change
-	{
-		//UHF antenna 1, LED1 12
-		//UHF antenna 2, LED1 16
-		//UHF antenna 3, LED1 20
-		//UHF antenna 4, LED1 21
+	Antenna_Deploy_Cmd();
 
-		GPIO_LibInit();
-
-		GPIOLib_Export(12);
-		GPIOLib_Direction(12,1);
-		GPIOLib_Write(12,1);
-
-		if (GPIOLib_Read(12) == 1)
-			{
-				OS_printf("L3:UHF antenna 1 deploy done\n");
-				cndh_log.mode_status++;
-				//sleep(1);
-				GPIOLib_Write(12,0);
-			}
-
-		GPIOLib_Export(16);
-		GPIOLib_Direction(16,1);
-		GPIOLib_Write(16,1);
-
-		if (GPIOLib_Read(16) == 1)
-			{
-				OS_printf("L3:UHF antenna 2 deploy done\n");
-				cndh_log.mode_status++;
-				//sleep(1);
-				GPIOLib_Write(16,0);
-			}
-
-		GPIOLib_Export(20);
-		GPIOLib_Direction(20,1);
-		GPIOLib_Write(20,1);
-
-		if (GPIOLib_Read(20) == 1)
-			{
-				OS_printf("L3:UHF antenna 3 deploy done\n");
-				cndh_log.mode_status++;
-				//sleep(1);
-				GPIOLib_Write(20,0);
-			}
-
-		GPIOLib_Export(21);
-		GPIOLib_Direction(21,1);
-		GPIOLib_Write(21,1);
-
-		if (GPIOLib_Read(21) == 1)
-			{
-				OS_printf("L3:UHF antenna 4 deploy done\n");
-				cndh_log.mode_status++;
-				//sleep(1);
-				GPIOLib_Write(21,0);
-			}
-		GPIOLib_Unexport(12);
-		GPIOLib_Unexport(16);
-		GPIOLib_Unexport(20);
-		GPIOLib_Unexport(21);
-		GPIOLib_Close();
-		cndh_log.Antenna_status = 1;
-	}
-
-
-	if (cndh_log.Antenna_status == 1)
-	{
-		cndh_log.mode_status++;
-		cndh_log.mode_status++;
-		cndh_log.mode_status++;
-		cndh_log.mode_status++;
-	}
+	cndh_log.mode_status = cndh_log.mode_status + cndh_log.Antenna_status;
 
 	if (cndh_locallog.AX100_Checksum == 1) //AX100U check sum result
 	{
@@ -470,7 +459,6 @@ void Separation_Mode_1U(void)
 	{
 		cndh_flag.flag = 2;
 	}
-
 }
 
 void Stablization_Mode_1U(void)
@@ -478,33 +466,7 @@ void Stablization_Mode_1U(void)
 	cndh_log.mode_status = 0;
 	OS_printf("L1:Early orbit phase: Stablization mode 1U entry\n");
 
-	if (cndh_locallog.Soc != 0)
-	{
-		OS_printf("L0:CNDH, Current Soc is %d\n", cndh_locallog.Soc);
-		if (cndh_locallog.temp != 0)
-		{
-			OS_printf("L0:CNDH, Current bat temp is %d\n", cndh_locallog.temp);
-			cndh_log.mode_status++;
-		}
-	}
-
-	if (cndh_locallog.IMU_Checksum == 1)
-	{
-		if (cndh_locallog.MMT_Checksum ==1)
-		{
-			OS_printf("L2:CNDH, IMU/MMT checksum done\n");
-			cndh_log.mode_status++;
-		}
-	}
-
-	if (cndh_locallog.FSS_Checksum == 1)
-	{
-		if (cndh_locallog.CSS_Checksum == 1)
-		{
-			OS_printf("L2:CNDH, FSS/CSS checksum done\n");
-			cndh_log.mode_status++;
-		}
-	}
+	cndh_log.mode_status = Sensor_Check();
 
 	if (cndh_locallog.AngVel[0] > 5 || cndh_locallog.AngVel[0] < -5)
 		{
@@ -561,33 +523,8 @@ void normalEO_Mode_1U(void)
 	cndh_log.mode_status = 0;
 
 	OS_printf("L1:Early orbit phase: Normal mode 1U entry\n");
-	if (cndh_locallog.Soc != 0)
-	{
-		OS_printf("L0:CNDH, Current Soc is %d\n", cndh_locallog.Soc);
-		if (cndh_locallog.temp != 0)
-		{
-			OS_printf("L0:CNDH, Current bat temp is %d\n", cndh_locallog.temp);
-			cndh_log.mode_status++;
-		}
-	}
 
-	if (cndh_locallog.IMU_Checksum == 1)
-	{
-		if (cndh_locallog.MMT_Checksum ==1)
-		{
-			OS_printf("L2:CNDH, IMU/MMT checksum done\n");
-			cndh_log.mode_status++;
-		}
-	}
-
-	if (cndh_locallog.FSS_Checksum == 1)
-	{
-		if (cndh_locallog.CSS_Checksum == 1)
-		{
-			OS_printf("L2:CNDH, FSS/CSS checksum done\n");
-			cndh_log.mode_status++;
-		}
-	}
+	Sensor_Check();
 
 	if (cndh_locallog.AX100_Checksum == 1) //AX100U check sum result
 		{
@@ -595,11 +532,11 @@ void normalEO_Mode_1U(void)
 			cndh_log.mode_status++;
 		}
 
-		if (cndh_locallog.AX100_Checksum == 1) //AX100U check sum result
-		{
-			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_cmd_coms, COMS_TRANSMIT_BEACON); //send command 1 to coms for beacon
-			CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_cmd_coms);
-		}
+	if (cndh_locallog.AX100_Checksum == 1) //AX100U check sum result
+	{
+		CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &cndh_cmd_coms, COMS_TRANSMIT_BEACON); //send command 1 to coms for beacon
+		CFE_SB_SendMsg((CFE_SB_Msg_t *) &cndh_cmd_coms);
+	}
 }
 
 /************************/

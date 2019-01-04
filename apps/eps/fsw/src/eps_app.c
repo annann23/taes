@@ -26,6 +26,7 @@
 // library and other code include
 #include <string.h>
 #include <stdio.h>
+#include "gpio_lib.h"
 
 /* EPS global data */
 
@@ -34,8 +35,12 @@ eps_hk_tlm_t    eps_hk_tlm;
 eps_log_t	    eps_log;
 
 // send log data list
-eps_log_cndh_t  eps_log_cndh;
-eps_log_coms_t  eps_log_coms;
+eps_log_cndh_t  		eps_log_cndh;
+eps_log_cndh_antenna_t  eps_log_cndh_antenna;
+eps_log_coms_t  		eps_log_coms;
+
+// receive log data list
+cndh_log_eps_t		*cndh_log_eps;
 
 // application pointers
 CFE_SB_PipeId_t    eps_CommandPipe;
@@ -162,11 +167,29 @@ void EPS_ProcessGroundCommand(void)
             break;
 
 		case EPS_AX100_ON:
-			eps_log_cndh.AX100_Status = 1;
+			eps_hk_tlm.eps_command_count++;
+			CFE_SB_InitMsg(&eps_log_coms, COMS_CMD_MID, EPS_LOG_COMS_LENGTH, TRUE);
 			eps_log_coms.AX100_Status = 1;
 			OS_printf("L3:EPS, AX100 on\n");
+			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &eps_log_coms.TlmHeader,COMS_GET_EPS_CC);
+			CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_log_coms);
 			break;
         /* default case already found during FC vs length test */
+
+		case EPS_ANTENNA_DEPLOY:
+			OS_printf("L0:EPS, CNDH data get\n");
+			eps_hk_tlm.eps_command_count++;
+
+			cndh_log_eps = (cndh_log_eps_t *)epsMsgPtr;
+			eps_log.Antenna_number = cndh_log_eps->Antenna_number;
+
+			CFE_SB_InitMsg(&eps_log_cndh_antenna, CNDH_CMD_MID, EPS_LOG_CNDH_ANTENNA_LENGTH, TRUE);
+
+			eps_log_cndh_antenna.Antenna_status = Antenna_Deploy(eps_log.Antenna_number);
+
+			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &eps_log_cndh_antenna, CNDH_GET_EPS_ANTENNA_CC);
+			CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_log_cndh_antenna);
+			break;
         default:
             break;
     }
@@ -177,25 +200,54 @@ void EPS_ProcessGroundCommand(void)
 void EPS_ProcessScheduleCommand(void)
 {
     CFE_SB_InitMsg(&eps_log_cndh, CNDH_CMD_MID, EPS_LOG_CNDH_LENGTH, TRUE);
-	CFE_SB_InitMsg(&eps_log_coms, COMS_CMD_MID, EPS_LOG_COMS_LENGTH, TRUE);
 
 	eps_log_cndh.Soc = 70;
 	eps_log_cndh.temp = 30;
 
-	if (eps_log_cndh.AX100_Status == 1)
-	{
-		if (eps_log.buf2 == 0)
-		{
-			CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &eps_log_coms.TlmHeader,COMS_GET_EPS_CC);
-			CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_log_coms);
-		}
-		eps_log.buf2 = 1;
-	}
+	eps_log_cndh.AX100_Status = eps_log_coms.AX100_Status;
 
 	EPS_SendData();
 
 }
 
+void EPS_SendData(void)
+{
+	CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &eps_log_cndh, CNDH_GET_EPS_CC);
+	CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_log_cndh);
+	return;
+}
+
+uint8 Antenna_Deploy(uint16 antenna_number)
+{
+	uint8 antenna_status;
+
+	GPIO_LibInit();
+
+	GPIOLib_Export(antenna_number);
+	GPIOLib_Direction(antenna_number,1);
+	GPIOLib_Write(antenna_number,1);
+
+	OS_printf("L3: EPS, UHF antenna (LED %d) deploy start\n", antenna_number);
+	sleep(2);
+	if (GPIOLib_Read(antenna_number) == 1)
+	{
+		OS_printf("L3: EPS, UHF antenna (LED %d) deploy done\n", antenna_number);
+		GPIOLib_Write(antenna_number,0);
+		switch (antenna_number)
+			{
+				case 12: antenna_status = 1; break;
+				case 16: antenna_status = 2; break;
+				case 20: antenna_status = 3; break;
+				case 21: antenna_status = 4; break;
+			}
+	}
+
+	GPIOLib_Unexport(antenna_number);
+
+	GPIOLib_Close();
+
+	return(antenna_status);
+}
 
 void EPS_ReportHousekeeping(void)
 {
@@ -204,12 +256,6 @@ void EPS_ReportHousekeeping(void)
     return;
 }/* End of template_ReportHousekeeping() */
 
-void EPS_SendData(void)
-{
-	CFE_SB_SetCmdCode((CFE_SB_MsgPtr_t) &eps_log_cndh, CNDH_GET_EPS_CC);
-	CFE_SB_SendMsg((CFE_SB_Msg_t *) &eps_log_cndh);
-	return;
-}
 void EPS_ResetCounters(void)
 {
     /* Status of commands processed by the template App */

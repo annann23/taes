@@ -63,6 +63,9 @@ void CNDH_ResetCounters(void);
 void CNDH_Save_data(int number);
 boolean CNDH_VerifyCmdLength(CFE_SB_MsgPtr_t msg, uint16 ExpectedLength);
 
+uint8 Sensor_Check(void);
+void Antenna_Deploy_Cmd(void);
+
 void Separation_Mode_1U(void);
 void Stablization_Mode_1U(void);
 void normalEO_Mode_1U(void);

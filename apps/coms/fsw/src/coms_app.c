@@ -222,7 +222,7 @@ void COMS_ProcessScheduleCommand(void)
 
 	if (coms_log.AX100_Status == 1)
 	{
-		coms_log_cndh.AX100_Checksum = 1;
+		coms_log_cndh.AX100_Checksum = coms_log.AX100_Status;
 		OS_printf("L3:COMS, AX100 operation normal\n");
 	}
 
